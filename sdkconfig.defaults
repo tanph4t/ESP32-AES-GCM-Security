@@ -1,5 +1,18 @@
+# Measurement baseline. Keep in sync with sdkconfig.perf, the file used for
+# the numbers reported in the thesis.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
+CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
+CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ=240
+
 # Worker tasks enqueue ACKs; avoid the default 1000 ms receive poll delaying
 # outgoing messages. Keep transport scheduling identical in both AES modes.
 CONFIG_MQTT_USE_CUSTOM_CONFIG=y
 CONFIG_MQTT_POLL_READ_TIMEOUT_MS=10
 CONFIG_HEAP_USE_HOOKS=y
+
+# Per-command logging must not sit inside the measured window.
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_LOG_DEFAULT_LEVEL=2
+CONFIG_LOG_MAXIMUM_LEVEL=2

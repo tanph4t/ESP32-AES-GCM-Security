@@ -61,8 +61,11 @@ Các gói AES-256 cũ không xác thực được bằng khóa AES-128. Sau khi 
 3. Mở ESP-IDF Terminal tại `GCM/AES_GCM/`, chạy:
 
 ```bash
-idf.py build flash monitor
+idf.py -B build-perf -DSDKCONFIG=sdkconfig.perf build flash monitor
 ```
+
+Lệnh này dùng cấu hình đo; xem mục **Build trên máy hiện tại** để biết lý do và
+cách kiểm tra.
 
 4. Khi `ENABLE_AES_GCM=1`: gửi gói mã hóa mới từ web; xác nhận ON/OFF và hành vi auto-lock/ACK của module phần cứng hiện có. MQTT.fx gửi ON/OFF thuần phải bị từ chối.
 5. Để chạy đối chứng: đổi `ENABLE_AES_GCM` thành 0, build/flash lại; gửi trực tiếp ON/OFF từ MQTT.fx. Đây là công tắc lúc biên dịch, không phải công tắc đổi thuật toán tức thời trên web. TLS vẫn hoạt động như cấu hình hiện có.
@@ -173,11 +176,36 @@ Kiểm thử web: `python -m unittest discover -s tests -v` từ thư mục `AES
 
 ### Build trên máy hiện tại
 
-Công cụ ESP-IDF nằm tại `C:/Espressif/frameworks/esp-idf-v5.5.5`. VS Code dùng
-`build-local` để tránh cache `build` cũ đang trỏ tới `D:/GCM/AES_GCM` và
-`D:/Espressif`. Mở thư mục dự án `AES_GCM` trong VS Code; trong ESP-IDF Terminal,
-chạy `idf.py -B build-local build`. Sau khi build đạt, có thể nạp bằng
-`idf.py -B build-local -p COM4 flash monitor` (chọn lại cổng nếu thiết bị dùng cổng khác).
+Công cụ ESP-IDF nằm tại `C:/Espressif/frameworks/esp-idf-v5.5.5`. Dùng thư mục
+build riêng (`build-perf`) để tránh cache cũ trỏ tới `D:/GCM/AES_GCM` hoặc
+`D:/Espressif`.
+
+**Bắt buộc dùng cấu hình đo.** Số liệu trong báo cáo được lấy từ
+`sdkconfig.perf`: CPU 240 MHz, biên dịch PERF (`-O2`), log mức WARN, heap hooks
+bật, MQTT poll 10 ms. `main/command_memory.c` báo lỗi biên dịch nếu thiếu
+`CONFIG_HEAP_USE_HOOKS`, nên build bằng `sdkconfig` mặc định sẽ fail. Trong
+ESP-IDF Terminal, mở thư mục dự án `AES_GCM` và chạy:
+
+```bash
+idf.py -B build-perf -DSDKCONFIG=sdkconfig.perf build
+idf.py -B build-perf -DSDKCONFIG=sdkconfig.perf -p COM4 flash monitor
+```
+
+Chọn lại cổng nếu thiết bị dùng cổng khác. Phải giữ `-DSDKCONFIG=sdkconfig.perf`
+kể cả khi thư mục gốc đã có `sdkconfig`: file đó bị `.gitignore` và trên máy này
+đang là bản debug 160 MHz, không dùng để đo. Nếu muốn dùng `sdkconfig` mặc định,
+xóa nó rồi build lại; ESP-IDF sẽ sinh từ `sdkconfig.defaults`, đã chứa cùng
+baseline đo.
+
+Kiểm tra build thực tế đã đúng cấu hình:
+
+```bash
+grep -E 'CONFIG_(ESP_DEFAULT_CPU_FREQ_MHZ|COMPILER_OPTIMIZATION_PERF|HEAP_USE_HOOKS|LOG_DEFAULT_LEVEL |MQTT_POLL_READ_TIMEOUT_MS)' build-perf/config/sdkconfig.h
+```
+
+Kết quả phải có 240 MHz, `CONFIG_COMPILER_OPTIMIZATION_PERF 1`,
+`CONFIG_HEAP_USE_HOOKS 1`, `CONFIG_LOG_DEFAULT_LEVEL 2` và poll 10 ms. Build
+bằng cấu hình khác vẫn chạy nhưng số đo không so sánh được với số trong báo cáo.
 
 
 ### Mức GPIO điều khiển khóa
