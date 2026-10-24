@@ -170,7 +170,7 @@ def percentile(values, q):
 
 
 def summarise(rows):
-    result = {"n": len(rows), "payload_bytes": None, "memory_valid": 0}
+    result = {"n": len(rows), "payload_bytes": None, "memory_valid": 0, "memory": None}
     sizes = [r["payload_bytes"] for r in rows if isinstance(r["payload_bytes"], int)]
     if sizes:
         result["payload_bytes"] = {"min": min(sizes), "max": max(sizes),
@@ -188,13 +188,30 @@ def summarise(rows):
                           "sd": sd, "p95": percentile(values, 95),
                           "min": min(values), "max": max(values),
                           "ci95": [mean - margin, mean + margin]}
+    stack, allocations, heap_peak_max, retained_max, legacy = [], 0, 0, 0, 0
     for row in rows:
-        if row["command_memory_json"]:
-            try:
-                if json.loads(row["command_memory_json"]).get("status") == "valid":
-                    result["memory_valid"] += 1
-            except (ValueError, TypeError):
-                pass
+        if not row["command_memory_json"]:
+            continue
+        try:
+            memory = json.loads(row["command_memory_json"])
+        except (ValueError, TypeError):
+            continue
+        if memory.get("status") != "valid":
+            continue
+        result["memory_valid"] += 1
+        allocations += memory.get("allocations", 0)
+        heap_peak_max = max(heap_peak_max, memory.get("heap_peak", 0))
+        retained_max = max(retained_max, memory.get("heap_retained", 0))
+        if memory.get("v") == 1:
+            legacy += 1
+        elif isinstance(memory.get("stack_peak"), int) and memory["stack_peak"] > 0:
+            stack.append(memory["stack_peak"])
+    result["memory"] = {
+        "valid": result["memory_valid"], "v1": legacy, "stack_n": len(stack),
+        "stack_peak": ({"mean": statistics.mean(stack), "median": statistics.median(stack),
+                        "min": min(stack), "max": max(stack)} if stack else None),
+        "allocations_total": allocations, "heap_peak_max": heap_peak_max,
+        "heap_retained_max": retained_max}
     return result
 
 
@@ -218,7 +235,10 @@ def analyse(db_path, batches, energy_session):
             "elapsed_s": batch["elapsed_s"],
             "outcomes": {row["outcome"]: row["n"] for row in outcome_rows},
             "all": summarise(rows) if rows else None,
-            "applied": summarise(applied)})
+            "applied": summarise(applied),
+            "memory_by_command": {command: summarise([row for row in applied if row["command"] == command])["memory"]
+                                  for command in ("ON", "OFF")
+                                  if any(row["command"] == command for row in applied)}})
     if energy_session:
         session_id = energy_session["session"]["id"]
         blocks = connection.execute(

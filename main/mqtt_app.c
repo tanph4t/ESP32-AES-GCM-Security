@@ -110,15 +110,15 @@ void mqtt_app_publish_command_ack(const char *id, int state, int64_t decrypt_us,
     int n = snprintf(json, sizeof(json),
         "{\"status\":\"%s\",\"message\":\"%s\",\"command_id\":\"%s\","
         "\"command\":\"%s\",\"phase\":\"%s\",\"decrypt_us\":%s,\"execution_us\":%s,\"aes_enabled\":%s,"
-        "\"memory\":{\"v\":1,\"valid\":%s,\"heap_before\":%" PRIu32 ",\"heap_after\":%" PRIu32
+        "\"memory\":{\"v\":2,\"valid\":%s,\"heap_before\":%" PRIu32 ",\"heap_after\":%" PRIu32
         ",\"heap_peak\":%" PRIu32 ",\"heap_retained\":%" PRIu32 ",\"allocations\":%" PRIu32
-        ",\"stack_free_min\":%" PRIu32 ",\"context_bytes\":%" PRIu32 "}}",
+        ",\"stack_free_min\":%" PRIu32 ",\"context_bytes\":%" PRIu32 ",\"stack_peak\":%" PRIu32 "}}",
         applied ? (state ? "UNLOCKED" : "LOCKED") : "BUSY",
         applied ? "GPIO relay da cap nhat" : "Khong thuc thi duoc GPIO / hang doi day",
         id, state ? "ON" : "OFF", applied ? "applied" : "rejected", timing, execution,
         memory->aes_enabled ? "true" : "false", memory->valid ? "true" : "false",
         memory->heap_before, memory->heap_after, memory->heap_peak, memory->heap_retained,
-        memory->allocations, memory->stack_free_min, memory->context_bytes);
+        memory->allocations, memory->stack_free_min, memory->context_bytes, memory->stack_peak);
     if (n > 0 && (size_t)n < sizeof(json)) publish_json(json);
 }
 

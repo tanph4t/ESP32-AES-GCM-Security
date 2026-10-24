@@ -13,10 +13,11 @@ from web_server import create_app, Store, STATUS_TOPIC
 from command_memory_web import FIELDS, parse_memory
 
 
-def sample(aes=True, peak=64):
-    return dict(v=1, valid=True, heap_before=150000, heap_after=150000,
+def sample(aes=True, peak=64, stack_peak=180):
+    return dict(v=2, valid=True, heap_before=150000, heap_after=150000,
                 heap_peak=peak, heap_retained=0, allocations=int(peak > 0),
-                stack_free_min=1800, context_bytes=400 if aes else 0)
+                stack_free_min=1800, context_bytes=400 if aes else 0,
+                stack_peak=stack_peak)
 
 
 class CommandMemoryTests(unittest.TestCase):
@@ -28,14 +29,14 @@ class CommandMemoryTests(unittest.TestCase):
     def tearDown(self):
         self.d.store.close()
 
-    def pending(self, number=1, aes=True, command='ON', peak=64):
+    def pending(self, number=1, aes=True, command='ON', peak=64, stack_peak=180):
         ident=f'{number:016x}'
         self.d.store.record_measurement(dict(ts=time.time(), mode='on' if aes else 'off',
             source='command', outcome='pending', command_id=ident, command=command))
         self.d.pending_commands[ident]=dict(command=command, encrypted=aes, start_ns=time.perf_counter_ns())
         return dict(command_id=ident, command=command, phase='applied',
                     status='UNLOCKED' if command=='ON' else 'LOCKED', aes_enabled=aes,
-                    memory=sample(aes,peak), execution_us=100)
+                    memory=sample(aes,peak,stack_peak), execution_us=100)
 
     def receive(self, ack):
         self.d._receive_command_ack(ack, time.perf_counter_ns(), time.time())
@@ -54,7 +55,26 @@ class CommandMemoryTests(unittest.TestCase):
         rows=list(csv.DictReader(io.StringIO(csv_text)))
         self.assertEqual(rows[0]['heap_retained'],'0')
         self.assertEqual(rows[0]['heap_peak'],'64')
+        self.assertEqual(rows[0]['stack_peak'],'180')
         self.assertEqual(rows[1]['heap_peak'],'0')
+
+    def test_stack_peak_groups_and_legacy_rows(self):
+        self.receive(self.pending(1,True,'ON',peak=0,stack_peak=900))
+        self.receive(self.pending(2,True,'ON',peak=0,stack_peak=940))
+        self.receive(self.pending(3,True,'OFF',peak=0,stack_peak=500))
+        legacy=self.pending(4,True,'OFF',peak=0)
+        legacy['memory']={k:v for k,v in legacy['memory'].items() if k!='stack_peak'}|{'v':1}
+        self.receive(legacy)
+        data=self.client.get('/api/command-memory').get_json()
+        self.assertEqual(data['valid'],4)
+        self.assertEqual(data['legacy'],1)
+        groups={(g['command'],g['mode']):g for g in data['groups']}
+        self.assertEqual(groups['ON','on']['stack_n'],2)
+        self.assertEqual(groups['ON','on']['stack_mean'],920)
+        self.assertEqual(groups['ON','on']['stack_max'],940)
+        self.assertEqual(groups['OFF','on']['stack_n'],1)
+        self.assertEqual(groups['OFF','on']['stack_mean'],500)
+        self.assertIsNone(groups['ON','off']['stack_mean'])
 
     def test_wrong_mode_id_duplicate_and_rejected_are_excluded(self):
         ack=self.pending()
@@ -85,8 +105,11 @@ class CommandMemoryTests(unittest.TestCase):
                 with self.subTest(field=field,value=value):
                     m=sample();m[field]=value
                     self.assertEqual(parse_memory(dict(memory=m,aes_enabled=True),True)['status'],'invalid')
-        for changes in ({'heap_retained':65},{'allocations':0},{'context_bytes':0},{'v':2}):
+        for changes in ({'heap_retained':65},{'allocations':0},{'context_bytes':0},
+                        {'stack_peak':0},{'stack_peak':65537},{'v':3}):
             self.assertEqual(parse_memory(dict(memory=sample()|changes,aes_enabled=True),True)['status'],'invalid')
+        legacy={k:v for k,v in sample().items() if k!='stack_peak'}|{'v':1}
+        self.assertEqual(parse_memory(dict(memory=legacy,aes_enabled=True),True)['status'],'valid')
 
     def test_on_off_and_modes_stay_separate(self):
         for i,(cmd,aes,peak) in enumerate([('ON',True,64),('ON',True,128),('OFF',True,256),('ON',False,0),('OFF',False,16)],1):

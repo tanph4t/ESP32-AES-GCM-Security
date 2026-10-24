@@ -6,26 +6,33 @@ from datetime import datetime
 from flask import Response, jsonify, request
 
 FIELDS = ("heap_before", "heap_after", "heap_peak", "heap_retained", "allocations",
-          "stack_free_min", "context_bytes")
+          "stack_free_min", "context_bytes", "stack_peak")
+V1_FIELDS = FIELDS[:-1]
 
 
 def parse_memory(data, encrypted):
     sample = data.get("memory")
     if sample is None:
         return {"status": "missing"}
-    if (not isinstance(sample, dict) or type(sample.get("v")) is not int or sample["v"] != 1
+    if not isinstance(sample, dict):
+        return {"status": "invalid"}
+    version = sample.get("v")
+    # v1 has no per-command stack probe; keep it readable but less informative.
+    if (type(version) is not int or version not in (1, 2)
             or type(data.get("aes_enabled")) is not bool or data["aes_enabled"] != encrypted
             or sample.get("valid") is not True):
         return {"status": "invalid"}
+    fields = FIELDS if version == 2 else V1_FIELDS
     # A malformed/overflowed trace is unavailable, never a zero-byte sample.
-    if any(type(sample.get(k)) is not int or not 0 <= sample[k] <= 16 * 1024 * 1024 for k in FIELDS):
+    if any(type(sample.get(k)) is not int or not 0 <= sample[k] <= 16 * 1024 * 1024 for k in fields):
         return {"status": "invalid"}
     if (sample["heap_retained"] > sample["heap_peak"]
             or (sample["allocations"] == 0 and sample["heap_peak"] != 0)
             or (encrypted and sample["context_bytes"] == 0)
-            or (not encrypted and sample["context_bytes"] != 0)):
+            or (not encrypted and sample["context_bytes"] != 0)
+            or (version == 2 and not 1 <= sample["stack_peak"] <= 64 * 1024)):
         return {"status": "invalid"}
-    return {"status": "valid", "v": 1, **{k: sample[k] for k in FIELDS}}
+    return {"status": "valid", "v": version, **{k: sample[k] for k in fields}}
 
 
 def register_memory_routes(app, dashboard, timezone):
@@ -50,13 +57,18 @@ def register_memory_routes(app, dashboard, timezone):
         for command in ("ON", "OFF"):
             for mode in ("on", "off"):
                 group = [s for s in samples if s["command"] == command and s["mode"] == mode and s["status"] == "valid"]
+                stack = [s["stack_peak"] for s in group if isinstance(s.get("stack_peak"), int)]
                 groups.append(dict(command=command, mode=mode, n=len(group),
                     peak_mean=sum(s["heap_peak"] for s in group)/len(group) if group else None,
                     peak_max=max((s["heap_peak"] for s in group), default=None),
-                    retained_mean=sum(s["heap_retained"] for s in group)/len(group) if group else None))
+                    retained_mean=sum(s["heap_retained"] for s in group)/len(group) if group else None,
+                    stack_n=len(stack),
+                    stack_mean=sum(stack)/len(stack) if stack else None,
+                    stack_max=max(stack) if stack else None))
         return jsonify(date=day, groups=groups, latest=samples[0] if samples else None,
                        samples=samples[:30], valid=sum(s["status"] == "valid" for s in samples),
-                       unavailable=sum(s["status"] != "valid" for s in samples), limit=2000)
+                       unavailable=sum(s["status"] != "valid" for s in samples),
+                       legacy=sum(s.get("v") == 1 for s in samples), limit=2000)
 
     @app.get("/api/command-memory.csv")
     def command_memory_csv():

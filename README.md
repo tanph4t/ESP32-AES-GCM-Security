@@ -362,4 +362,6 @@ TLS và broker vẫn đóng góp vào độ trễ đầu-cuối.
 
 ## Bộ nhớ xử lý từng lệnh ON/OFF
 
-Firmware đo heap cấp phát đỉnh trong tác vụ xử lý lệnh, heap còn giữ, heap trống trước/sau và thông tin stack. Web có khối **Bộ nhớ xử lý lệnh · ESP32**, bảng so sánh riêng ON/OFF ở hai chế độ AES và CSV từng lệnh. Cần nạp firmware mới, khởi động lại web và Ctrl+F5. Phạm vi, giới hạn và hướng dẫn báo cáo: [docs/command-memory.md](docs/command-memory.md).
+Firmware protocol 2 đo hai thứ trong cùng tác vụ xử lý lệnh: heap cấp phát đỉnh (0 byte là hợp lệ — đường này không cấp phát động) và **stack đỉnh từng lệnh**, bằng cách tô lại vùng stack chưa dùng bằng 0xA5 rồi quét byte bị ghi sâu nhất. Ngữ cảnh `mbedtls_gcm_context` 392 byte nằm trên stack và đã nằm trong stack đỉnh; không cộng thêm. Chênh `stack_peak` giữa AES bật và tắt là phần RAM vận hành tăng thêm của AES.
+
+Web có khối **Bộ nhớ xử lý lệnh · ESP32**, bảng so sánh riêng ON/OFF ở hai chế độ AES và CSV từng lệnh. Mẫu v1 cũ không có `stack_peak`; phải nạp firmware protocol 2 và đo lại cả hai chế độ, không suy stack từ dữ liệu v1. Cần khởi động lại web và Ctrl+F5. Phạm vi, giới hạn và hướng dẫn báo cáo: [docs/command-memory.md](docs/command-memory.md).
