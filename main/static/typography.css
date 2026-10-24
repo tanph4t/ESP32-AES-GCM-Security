@@ -1,0 +1,29 @@
+:root {
+  --font-ui: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", Consolas, monospace;
+}
+
+body { font-family: var(--font-ui); }
+button, input, select, textarea { font-family: inherit; }
+
+.metric-value,
+.cycle-kpis strong,
+.mono, code, pre,
+.packet-meta strong,
+.data-table td:last-child,
+.stats-block .stats-table tbody td:not(:first-child),
+.cycle-scroll .stats-table tbody td:nth-child(n+3),
+input[type="number"],
+.timeline-axis,
+.history-row time,
+#clock,
+#cycleChart text {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.metric-value, .cycle-kpis strong { letter-spacing: -0.02em; }
+.mono, code, pre { font-variant-ligatures: none; }
+
+/* Textual error messages in numeric table cells remain easy to read. */
+.cycle-scroll .stats-table small { font-family: var(--font-ui); }

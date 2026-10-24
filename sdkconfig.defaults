@@ -1,0 +1,5 @@
+# Worker tasks enqueue ACKs; avoid the default 1000 ms receive poll delaying
+# outgoing messages. Keep transport scheduling identical in both AES modes.
+CONFIG_MQTT_USE_CUSTOM_CONFIG=y
+CONFIG_MQTT_POLL_READ_TIMEOUT_MS=10
+CONFIG_HEAP_USE_HOOKS=y

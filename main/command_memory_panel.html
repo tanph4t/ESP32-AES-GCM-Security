@@ -1,0 +1,22 @@
+<section class="memory-panel" aria-label="Bộ nhớ xử lý lệnh">
+ <div class="memory-toolbar"><h2>Bộ nhớ xử lý lệnh · ESP32</h2><label>Ngày <input type="date" id="memoryDate" aria-label="Ngày đo bộ nhớ"></label><a class="btn small" id="memoryCsv" href="/api/command-memory.csv">CSV bộ nhớ từng lệnh</a></div>
+ <p class="fineprint" id="memoryLatest">Chờ lệnh ON/OFF và số đo từ firmware mới.</p>
+ <div class="memory-kpis">
+  <div><span>Heap cấp phát đỉnh · lệnh gần nhất</span><strong id="memoryPeak">—</strong><small>byte</small></div>
+  <div><span>Heap còn giữ khi xử lý xong</span><strong id="memoryRetained">—</strong><small>byte</small></div>
+  <div><span>Kích thước ngữ cảnh GCM trên stack</span><strong id="memoryContext">—</strong><small>byte · sizeof, không phải đỉnh stack</small></div>
+  <div><span>Stack trống thấp nhất · tác vụ MQTT</span><strong id="memoryStack">—</strong><small>byte · tích lũy từ khi tạo tác vụ</small></div>
+ </div>
+ <details class="memory-details"><summary>So sánh AES bật/tắt và nhật ký từng lệnh</summary>
+  <p class="fineprint" id="memorySummary">Chưa có mẫu bộ nhớ.</p>
+  <div class="memory-scroll"><table class="stats-table"><thead><tr><th>Lệnh</th><th>Chế độ</th><th>Số mẫu</th><th>Heap đỉnh TB · byte</th><th>Heap đỉnh lớn nhất · byte</th><th>Chênh TB bật − tắt · byte</th></tr></thead><tbody id="memoryGroups"></tbody></table></div>
+  <h3>30 lệnh gần nhất trong ngày</h3>
+  <div class="memory-scroll"><table class="stats-table memory-log"><thead><tr><th>Thời điểm / mã lệnh</th><th>Lệnh / AES</th><th>Heap đỉnh · B</th><th>Heap còn giữ · B</th><th>Heap trống trước → sau · B</th><th>Số cấp phát</th><th>Kết quả đo</th></tr></thead><tbody id="memoryRows"><tr><td colspan="7">Chưa có số đo bộ nhớ từng lệnh.</td></tr></tbody></table></div>
+ </details>
+ <details class="memory-details"><summary>Phạm vi và cách hiểu số đo</summary>
+  <p>Heap cấp phát đỉnh là tổng số byte cấp phát mới còn tồn tại đồng thời cao nhất trong tác vụ xử lý lệnh. Theo dõi từ khi bắt đầu xử lý payload sau giải mã HEX đến khi kiểm tra xong lệnh và mã lệnh, trước khi đưa vào hàng đợi GPIO. AES bật bao gồm khởi tạo, đặt khóa, xác thực–giải mã và giải phóng GCM; AES tắt xử lý bản rõ.</p>
+  <p>Chỉ ghép số đo với ACK đặt GPIO đúng mã lệnh và chế độ. Heap cấp phát đỉnh không gồm heap đã cấp sẵn, bộ nhớ tĩnh, stack, phần quản lý của bộ cấp phát, MQTT/TLS ở tác vụ khác hay việc gửi ACK. Heap trống trước/sau là ảnh chụp toàn hệ thống, có thể dao động do Wi-Fi/TLS.</p>
+  <p>0 byte heap có thể đúng khi xử lý dùng bộ nhớ có sẵn hoặc stack. Kích thước ngữ cảnh GCM là sizeof trong bản firmware, chưa gồm các biến và lời gọi hàm khác. Stack trống thấp nhất là số tích lũy của tác vụ MQTT, không dùng để tính đỉnh stack riêng từng lệnh. Các số này chưa phải tổng RAM riêng của AES.</p>
+  <p>Chênh lệch so sánh riêng ON và OFF, chỉ dùng mẫu hợp lệ cùng phiên bản đo. Dữ liệu cũ hoặc thiếu được để trống. Bộ theo dõi thêm bộ nhớ tĩnh, dung lượng hàng đợi và thời gian xử lý; hãy đo lại cả hai chế độ bằng cùng firmware mới khi so sánh tốc độ hoặc năng lượng.</p>
+ </details>
+</section>
